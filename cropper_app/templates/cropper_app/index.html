@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Label Cropper - Django Online Tool</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 2rem;
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            animation: fadeIn 0.8s ease-out;
+            overflow: hidden;
+        }
+
+        h1 {
+            font-weight: 600;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        p {
+            color: #94a3b8;
+            margin-bottom: 2rem;
+        }
+
+        .drop-zone {
+            width: 100%;
+            padding: 3rem 1.5rem;
+            border: 2px dashed var(--glass-border);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            position: relative;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: var(--primary);
+        }
+
+        .file-list {
+            text-align: left;
+            margin-top: 1.5rem;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 0.9rem;
+        }
+
+        .file-item {
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            margin-bottom: 4px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 1rem;
+            margin-top: 2rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: none;
+        }
+
+        .btn-submit:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
+        }
+
+        .loading {
+            display: none;
+            margin-top: 1rem;
+            color: var(--primary);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>PDF Label Cropper</h1>
+        <p>4 labels per A4 page. Django Powered.</p>
+        
+        <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div id="drop-zone" class="drop-zone">
+                <span class="upload-icon">📁</span>
+                <span>Drop PDF files here or click to upload</span>
+                <input type="file" id="pdf-files" name="pdf_files" multiple accept=".pdf" style="display: none;">
+            </div>
+
+            <div id="file-list" class="file-list"></div>
+            
+            <button type="submit" id="btn-submit" class="btn-submit">Process & Download</button>
+            <div id="loading" class="loading">Processing your labels...</div>
+        </form>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('pdf-files');
+        const fileList = document.getElementById('file-list');
+        const btnSubmit = document.getElementById('btn-submit');
+        const form = document.getElementById('upload-form');
+        const loading = document.getElementById('loading');
+
+        dropZone.onclick = () => fileInput.click();
+
+        dropZone.ondragover = (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        };
+
+        dropZone.ondragleave = () => {
+            dropZone.classList.remove('drag-over');
+        };
+
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            handleFiles(e.dataTransfer.files);
+        };
+
+        fileInput.onchange = (e) => {
+            handleFiles(e.target.files);
+        };
+
+        let currentFiles = [];
+
+        function handleFiles(files) {
+            // Strictly match 'order__' followed by exactly 10 to 15 digits only
+            const orderPattern = /^order__\d{10,15}\.pdf$/i;
+
+            const newFiles = Array.from(files).filter(f => {
+                return orderPattern.test(f.name);
+            });
+
+            currentFiles = [...currentFiles, ...newFiles];
+            updateUI();
+        }
+
+        function removeFile(index) {
+            currentFiles.splice(index, 1);
+            updateUI();
+        }
+
+        function updateUI() {
+            fileList.innerHTML = '';
+            const dt = new DataTransfer();
+            
+            currentFiles.forEach((file, index) => {
+                dt.items.add(file);
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span>✅</span>
+                        <span style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${file.name}</span>
+                    </div>
+                    <button type="button" onclick="removeFile(${index})" style="background: none; border: none; color: #ef4444; cursor: pointer; font-weight: bold; font-size: 1.1rem; padding: 0 5px;">&times;</button>
+                `;
+                fileList.appendChild(item);
+            });
+
+            fileInput.files = dt.files;
+            btnSubmit.style.display = currentFiles.length > 0 ? 'block' : 'none';
+        }
+
+        form.onsubmit = () => {
+            btnSubmit.style.display = 'none';
+            loading.style.display = 'block';
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        };
+    </script>
+</body>
+</html>

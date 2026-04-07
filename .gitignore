@@ -1,0 +1,15 @@
+venv/
+*.pyc
+__pycache__/
+db.sqlite3
+outputs/
+uploads/
+staticfiles/
+.env
+.DS_Store
+.idea/
+.vscode/
+*.pdf
+# Flask legacies (if still around)
+instance/
+.pytest_cache/
