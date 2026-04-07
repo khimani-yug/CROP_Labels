@@ -7,8 +7,8 @@ import re
 from datetime import date
 from django.conf import settings
 
-# Strictly match 'order__' followed by exactly 10 to 20 digits only
-ORDER_PATTERN = re.compile(r'^order__\d{10,20}\.pdf$', re.IGNORECASE)
+# Strictly match 'order__' followed by exactly 10 to 15 digits only
+ORDER_PATTERN = re.compile(r'^order__\d{10,15}\.pdf$', re.IGNORECASE)
 
 # Configuration
 A4_W, A4_H = 595, 842
