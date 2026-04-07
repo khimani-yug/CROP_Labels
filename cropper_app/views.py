@@ -4,6 +4,7 @@ import fitz
 import os
 import uuid
 import re
+from datetime import date
 from django.conf import settings
 
 # Strictly match 'order__' followed by exactly 10 to 20 digits only
@@ -96,7 +97,9 @@ def upload(request):
         try: os.rmdir(uploads_dir)
         except: pass
 
-        response = FileResponse(open(result_path, 'rb'), as_attachment=True, filename="merged_labels.pdf")
+        today = date.today().strftime('%d-%m-%y')
+        filename = f"order__{today}.pdf"
+        response = FileResponse(open(result_path, 'rb'), as_attachment=True, filename=filename)
         return response
 
     return HttpResponse("Method not allowed", status=405)
